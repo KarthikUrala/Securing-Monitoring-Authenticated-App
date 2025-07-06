@@ -1,40 +1,72 @@
-# Flask Auth0 Azure Monitoring Setup
 
-## Setup Steps
+# 🔐 Secure Flask App with Auth0 & Azure Monitoring
 
-### Auth0
-- Create an Auth0 tenant and configure an application.
-- Set allowed callback URLs and logout URLs to your Azure Web App URLs.
-- Get your Auth0 Domain, Client ID, and Client Secret.
+This project demonstrates a production-ready Flask application that integrates Auth0 authentication and Azure observability. It logs user activity and detects suspicious behavior using Azure Monitor and KQL.
 
-### Azure
-- Deploy your Flask app to Azure App Service.
-- Configure Azure Log Analytics workspace.
-- Connect your App Service logs to the Log Analytics workspace.
+---
 
-### .env File
-Create a `.env` file with the following environment variables:
+## 📦 Setup Steps
+
+### 🔐 Auth0 Configuration
+
+1. **Create a new Auth0 Tenant** at [auth0.com](https://auth0.com/).
+2. **Register a new Application** (Regular Web App).
+3. In **Application Settings**:
+   - Allowed Callback URLs:  
+     `https://<your-app-name>.azurewebsites.net/callback`
+   - Allowed Logout URLs:  
+     `https://<your-app-name>.azurewebsites.net/logout`
+4. Copy the following:
+   - **Client ID**
+   - **Client Secret**
+   - **Domain**
+
+---
+
+### ☁️ Azure Deployment
+
+1. Deploy the Flask app to **Azure App Service** (using Git or ZIP).
+2. In **App Service → Configuration**, add environment variables (from `.env`).
+3. Set **Startup Command** to:
+   ```bash
+   gunicorn --bind=0.0.0.0 --timeout 600 app:app
+   ```
+4. Enable:
+   - App Service logs
+   - Diagnostic settings to send logs to a **Log Analytics Workspace**
+
+---
+
+### 🛠️ `.env` File (for local development)
 
 ```
+FLASK_APP=app.py
+FLASK_ENV=production
 APP_SECRET_KEY=your_flask_secret_key
+
 AUTH0_CLIENT_ID=your_auth0_client_id
 AUTH0_CLIENT_SECRET=your_auth0_client_secret
 AUTH0_DOMAIN=your_auth0_domain
-APP_SECRET_KEY=your_secret
+AUTH0_CALLBACK_URL=https://your-app-name.azurewebsites.net/callback
+AUTH0_AUDIENCE=https://your-api-identifier
 ```
 
----
-
-## Logging and Detection Logic
-
-- The Flask app logs user login events and accesses to the `/protected` route.
-- Logs include user ID, name, IP address, and timestamp.
-- Azure Monitor captures these logs through AppServiceConsoleLogs.
-- We use a Kusto Query Language (KQL) query to detect users accessing `/protected` more than 10 times in 15 minutes.
+📌 **Note**: Do not commit `.env` to version control. Instead, share `.env.example` with placeholder values.
 
 ---
 
-## KQL Query
+## 🧾 Logging and Detection Logic
+
+- The Flask app logs:
+  - Successful logins: user_id, email, timestamp
+  - Access to `/protected`: user_id, IP, timestamp
+  - Unauthorized access attempts
+- Logs are sent using `app.logger.info()` or `app.logger.warning()`.
+- Azure collects logs using `AppServiceConsoleLogs`.
+
+---
+
+## 🔍 KQL Query (Suspicious Access Detection)
 
 ```kql
 AppServiceConsoleLogs
@@ -51,12 +83,22 @@ AppServiceConsoleLogs
 
 ---
 
-## Alert Logic
+## 🔔 Azure Monitor Alert Logic
 
-- Azure Monitor Alert triggers when any user accesses `/protected` more than 10 times in 15 minutes.
-- Alert severity is set to 3 (Low).
-- **Note:** Action Group email notification was skipped due to restrictions on creating Action Groups.
+- **Trigger**: If any user accesses `/protected` route more than 10 times in 15 minutes.
+- **Log Analytics condition**: Custom KQL query output count > 0
+- **Severity**: 3 (Low)
+- **Action Group**: _Skipped due to permission constraints_
 
 ---
 
-This setup helps monitor user access patterns and detect possible abuse or suspicious behavior in your Flask Auth0 app hosted on Azure.
+## ✅ Summary
+
+| Component | Description |
+|----------|-------------|
+| **Auth0** | Handles secure login (SSO) |
+| **Flask** | Backend app logging user behavior |
+| **Azure App Service** | Hosts the app |
+| **Log Analytics** | Captures logs |
+| **KQL** | Identifies suspicious patterns |
+| **Alerts** | Notifies on excessive access |
